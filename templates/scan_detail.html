@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Scan {{ record.id }}</h2>
+      <p class="muted">Targets: {{ record.targets }} | Ports: {{ record.ports }}</p>
+    </div>
+    <div class="panel-actions">
+      {% if record.json %}<a class="button ghost" href="{{ url_for('download', scan_id=record.id, kind='json') }}">Download JSON</a>{% endif %}
+      {% if record.html %}<a class="button ghost" href="{{ url_for('download', scan_id=record.id, kind='html') }}">Download HTML</a>{% endif %}
+      {% if record.pdf %}<a class="button" href="{{ url_for('download', scan_id=record.id, kind='pdf') }}">Download PDF</a>{% endif %}
+    </div>
+  </div>
+  <div class="status-row">
+    <span class="status {{ record.status }}">{{ record.status }}</span>
+    <span class="muted">Created: {{ record.created_at }}</span>
+    {% if record.started_at %}<span class="muted">Started: {{ record.started_at }}</span>{% endif %}
+    {% if record.finished_at %}<span class="muted">Finished: {{ record.finished_at }}</span>{% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Results</h2>
+  {% if scan_data %}
+    {% set host_results = scan_data.host_results %}
+    <div class="filter-row">
+      <input class="filter" type="text" placeholder="Filter hosts" data-filter-target="host-table" />
+    </div>
+    <div id="host-table" class="table">
+      <div class="table-head">
+        <div>Host</div>
+        <div>TCP Open</div>
+        <div>UDP Open</div>
+        <div>Risk</div>
+        <div>Vulnerabilities</div>
+      </div>
+      {% for host, info in host_results.items() %}
+        {% set vuln_count = info.vulnerabilities|length if info.vulnerabilities else 0 %}
+        <div class="table-row">
+          <div class="mono">{{ host }}</div>
+          <div>
+            {% if info.tcp_open %}
+              {% for port, detail in info.tcp_open.items() %}
+                <span class="pill">{{ port }} {{ detail.service }}</span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div>
+            {% if info.udp_open %}
+              {% for port, detail in info.udp_open.items() %}
+                <span class="pill ghost">{{ port }} {{ detail.state }}</span>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+          <div><span class="risk {{ 'high' if vuln_count >= 5 else 'medium' if vuln_count >= 2 else 'low' if vuln_count >= 1 else 'info' }}">{{ vuln_count }}</span></div>
+          <div>
+            {% if info.vulnerabilities %}
+              {% for vuln in info.vulnerabilities %}
+                <div class="vuln">
+                  <strong>{{ vuln.cve }}</strong> - {{ vuln.title }} ({{ vuln.severity }})
+                </div>
+              {% endfor %}
+            {% else %}-{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Results not ready yet. This page will refresh when the scan finishes.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Risk distribution</h2>
+  {% if scan_data %}
+    {% set high = 0 %}{% set medium = 0 %}{% set low = 0 %}{% set info = 0 %}
+    {% for host, info in scan_data.host_results.items() %}
+      {% set count = info.vulnerabilities|length if info.vulnerabilities else 0 %}
+      {% if count >= 5 %}{% set high = high + 1 %}
+      {% elif count >= 2 %}{% set medium = medium + 1 %}
+      {% elif count >= 1 %}{% set low = low + 1 %}
+      {% else %}{% set info = info + 1 %}
+      {% endif %}
+    {% endfor %}
+    <div class="bars">
+      <div class="bar">
+        <span>High</span>
+        <div class="bar-track"><div class="bar-fill high" style="width: {{ (high * 100) / (scan_data.host_results|length or 1) }}%"></div></div>
+        <span>{{ high }}</span>
+      </div>
+      <div class="bar">
+        <span>Medium</span>
+        <div class="bar-track"><div class="bar-fill medium" style="width: {{ (medium * 100) / (scan_data.host_results|length or 1) }}%"></div></div>
+        <span>{{ medium }}</span>
+      </div>
+      <div class="bar">
+        <span>Low</span>
+        <div class="bar-track"><div class="bar-fill low" style="width: {{ (low * 100) / (scan_data.host_results|length or 1) }}%"></div></div>
+        <span>{{ low }}</span>
+      </div>
+      <div class="bar">
+        <span>Info</span>
+        <div class="bar-track"><div class="bar-fill info" style="width: {{ (info * 100) / (scan_data.host_results|length or 1) }}%"></div></div>
+        <span>{{ info }}</span>
+      </div>
+    </div>
+  {% else %}
+    <p class="muted">Risk chart will appear after the scan completes.</p>
+  {% endif %}
+</section>
+
+{% if record.status in ['queued', 'running'] %}
+<script>
+  window.__SCAN_ID__ = "{{ record.id }}";
+</script>
+{% endif %}
+{% endblock %}

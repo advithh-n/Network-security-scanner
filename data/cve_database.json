@@ -1,0 +1,106 @@
+[
+  {
+    "cve": "CVE-2018-15473",
+    "title": "OpenSSH user enumeration",
+    "service": "ssh",
+    "product": "openssh",
+    "version": "openssh",
+    "port": 22,
+    "severity": "Medium"
+  },
+  {
+    "cve": "CVE-2021-41773",
+    "title": "Apache HTTP Server path traversal",
+    "service": "http",
+    "product": "apache",
+    "version": "2.4.49",
+    "port": 80,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2011-2523",
+    "title": "vsftpd backdoor",
+    "service": "ftp",
+    "product": "vsftpd",
+    "version": "2.3.4",
+    "port": 21,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2012-2122",
+    "title": "MySQL authentication bypass",
+    "service": "mysql",
+    "product": "mysql",
+    "version": "5.1",
+    "port": 3306,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2015-1427",
+    "title": "Elasticsearch Groovy sandbox bypass",
+    "service": "elasticsearch",
+    "product": "elasticsearch",
+    "version": "1.3",
+    "port": 9200,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2014-0160",
+    "title": "OpenSSL Heartbleed",
+    "service": "https",
+    "product": "openssl",
+    "version": "1.0.1",
+    "port": 443,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2022-0543",
+    "title": "Redis Lua sandbox escape",
+    "service": "redis",
+    "product": "redis",
+    "version": "4",
+    "port": 6379,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2018-1058",
+    "title": "PostgreSQL privilege escalation",
+    "service": "postgres",
+    "product": "postgresql",
+    "version": "10",
+    "port": 5432,
+    "severity": "Medium"
+  },
+  {
+    "cve": "CVE-2017-0144",
+    "title": "SMBv1 remote code execution (EternalBlue)",
+    "service": "smb",
+    "banner_contains": "smb",
+    "port": 445,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2020-0796",
+    "title": "SMBv3 remote code execution (SMBGhost)",
+    "service": "smb",
+    "banner_contains": "smb",
+    "port": 445,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2019-0708",
+    "title": "Remote Desktop Services RCE (BlueKeep)",
+    "service": "rdp",
+    "banner_contains": "rdp",
+    "port": 3389,
+    "severity": "High"
+  },
+  {
+    "cve": "CVE-2015-0235",
+    "title": "glibc GHOST vulnerability",
+    "service": "smtp",
+    "banner_contains": "smtp",
+    "port": 25,
+    "severity": "Medium"
+  }
+]
