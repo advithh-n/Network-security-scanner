@@ -1,0 +1,58 @@
+{
+  "scan_started": "2025-01-01T10:00:00Z",
+  "scan_finished": "2025-01-01T10:02:31Z",
+  "targets": "192.168.1.0/24",
+  "discovered_hosts": [
+    "192.168.1.10",
+    "192.168.1.21",
+    "192.168.1.33",
+    "192.168.1.44"
+  ],
+  "host_results": {
+    "192.168.1.10": {
+      "tcp_open": {
+        "22": {"service": "ssh", "banner": "OpenSSH_7.2p2", "product": "openssh", "version": "7.2p2"},
+        "80": {"service": "http", "banner": "Apache/2.4.49", "product": "apache", "version": "2.4.49"}
+      },
+      "udp_open": {
+        "53": {"state": "open|filtered"}
+      },
+      "vulnerabilities": [
+        {"cve": "CVE-2021-41773", "title": "Apache HTTP Server path traversal", "severity": "High"}
+      ]
+    },
+    "192.168.1.21": {
+      "tcp_open": {
+        "443": {"service": "https", "banner": "OpenSSL/1.0.1", "product": "openssl", "version": "1.0.1"},
+        "445": {"service": "smb", "banner": "SMB", "product": "", "version": ""}
+      },
+      "udp_open": {},
+      "vulnerabilities": [
+        {"cve": "CVE-2014-0160", "title": "OpenSSL Heartbleed", "severity": "High"},
+        {"cve": "CVE-2017-0144", "title": "SMBv1 remote code execution (EternalBlue)", "severity": "High"}
+      ]
+    },
+    "192.168.1.33": {
+      "tcp_open": {
+        "3306": {"service": "mysql", "banner": "MySQL/5.1", "product": "mysql", "version": "5.1"},
+        "6379": {"service": "redis", "banner": "Redis/4.0", "product": "redis", "version": "4.0"}
+      },
+      "udp_open": {
+        "161": {"state": "open|filtered"}
+      },
+      "vulnerabilities": [
+        {"cve": "CVE-2012-2122", "title": "MySQL authentication bypass", "severity": "High"},
+        {"cve": "CVE-2022-0543", "title": "Redis Lua sandbox escape", "severity": "High"}
+      ]
+    },
+    "192.168.1.44": {
+      "tcp_open": {
+        "3389": {"service": "rdp", "banner": "RDP", "product": "", "version": ""}
+      },
+      "udp_open": {},
+      "vulnerabilities": [
+        {"cve": "CVE-2019-0708", "title": "Remote Desktop Services RCE (BlueKeep)", "severity": "High"}
+      ]
+    }
+  }
+}

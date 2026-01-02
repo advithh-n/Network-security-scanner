@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Demo Scan Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    h1 { margin-bottom: 6px; }
+    .muted { color: #555; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background: #f2f2f2; }
+  </style>
+</head>
+<body>
+  <h1>Demo Network Security Scan Report</h1>
+  <div class="muted">Generated: 2025-01-01T10:02:31Z</div>
+  <div class="muted">Targets: 192.168.1.0/24</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Host</th>
+        <th>TCP Open Ports</th>
+        <th>UDP Open Ports</th>
+        <th>Risk</th>
+        <th>Vulnerabilities</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>192.168.1.10</td>
+        <td>22 (ssh)<br>80 (http)</td>
+        <td>53 (open|filtered)</td>
+        <td>High</td>
+        <td>CVE-2021-41773: Apache HTTP Server path traversal</td>
+      </tr>
+      <tr>
+        <td>192.168.1.21</td>
+        <td>443 (https)<br>445 (smb)</td>
+        <td>-</td>
+        <td>High</td>
+        <td>CVE-2014-0160: OpenSSL Heartbleed<br>CVE-2017-0144: SMBv1 remote code execution</td>
+      </tr>
+      <tr>
+        <td>192.168.1.33</td>
+        <td>3306 (mysql)<br>6379 (redis)</td>
+        <td>161 (open|filtered)</td>
+        <td>High</td>
+        <td>CVE-2012-2122: MySQL authentication bypass<br>CVE-2022-0543: Redis Lua sandbox escape</td>
+      </tr>
+      <tr>
+        <td>192.168.1.44</td>
+        <td>3389 (rdp)</td>
+        <td>-</td>
+        <td>High</td>
+        <td>CVE-2019-0708: Remote Desktop Services RCE</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

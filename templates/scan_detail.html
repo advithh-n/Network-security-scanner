@@ -5,6 +5,9 @@
     <div>
       <h2>Scan {{ record.id }}</h2>
       <p class="muted">Targets: {{ record.targets }} | Ports: {{ record.ports }}</p>
+      {% if record.demo %}
+        <p class="muted">Demo dataset loaded for presentation purposes.</p>
+      {% endif %}
     </div>
     <div class="panel-actions">
       {% if record.json %}<a class="button ghost" href="{{ url_for('download', scan_id=record.id, kind='json') }}">Download JSON</a>{% endif %}

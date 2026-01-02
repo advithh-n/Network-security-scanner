@@ -1,0 +1,7 @@
+__pycache__
+*.pyc
+.venv
+venv
+.git
+/data/scan_results
+/reports/report_*

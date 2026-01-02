@@ -16,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent
 SCAN_DIR = BASE_DIR / "data" / "scan_results"
 REPORT_DIR = BASE_DIR / "reports"
 INDEX_PATH = SCAN_DIR / "index.json"
+DEMO_JSON = BASE_DIR / "data" / "demo_scan.json"
+DEMO_HTML = BASE_DIR / "reports" / "sample_reports" / "demo_report.html"
 LOCK = threading.Lock()
 
 app = Flask(__name__)
@@ -193,6 +195,36 @@ def start_scan() -> Any:
     thread.start()
 
     return redirect(url_for("scan_detail", scan_id=scan_id))
+
+
+@app.route("/demo")
+def load_demo() -> Any:
+    if not DEMO_JSON.exists():
+        abort(404, "demo scan not found")
+
+    demo_id = "demo"
+    record = {
+        "id": demo_id,
+        "created_at": _now_iso(),
+        "status": "finished",
+        "targets": "demo (sample data)",
+        "ports": "21,22,80,443,445,3389",
+        "udp_ports": "53,161",
+        "timing": "normal",
+        "discovery": "ping,tcp",
+        "json": str(DEMO_JSON),
+        "html": str(DEMO_HTML) if DEMO_HTML.exists() else "",
+        "pdf": "",
+        "demo": True,
+    }
+
+    with LOCK:
+        items = load_index()
+        items = [item for item in items if item.get("id") != demo_id]
+        items.insert(0, record)
+        save_index(items)
+
+    return redirect(url_for("scan_detail", scan_id=demo_id))
 
 
 @app.route("/scan/<scan_id>")
