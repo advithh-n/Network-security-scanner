@@ -42,3 +42,9 @@ python app.py
 
 Then open `http://127.0.0.1:5000`.
 The UI lets you launch scans, view results, and download JSON/HTML/PDF reports.
+
+## Role-based access
+Default users (change these in `app.py` before sharing):
+- admin / admin123
+- analyst / analyst123
+- viewer / viewer123

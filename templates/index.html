@@ -31,48 +31,52 @@
 
 <section id="scan-form" class="panel">
   <h2>Run a new scan</h2>
-  <form method="post" action="{{ url_for('start_scan') }}" class="grid-form">
-    <label>
-      Targets (CIDR or range)
-      <input type="text" name="targets" placeholder="192.168.1.0/24" required />
-    </label>
-    <label>
-      TCP ports
-      <input type="text" name="ports" placeholder="22,80,443,3389" />
-    </label>
-    <label>
-      UDP ports
-      <input type="text" name="udp_ports" placeholder="53,161" />
-    </label>
-    <label>
-      Discovery methods
-      <input type="text" name="discovery" placeholder="ping,tcp,arp" />
-    </label>
-    <label>
-      Timing profile
-      <select name="timing">
-        <option value="paranoid">paranoid</option>
-        <option value="slow">slow</option>
-        <option value="normal" selected>normal</option>
-        <option value="fast">fast</option>
-      </select>
-    </label>
-    <label>
-      Threads
-      <input type="number" name="threads" value="200" min="10" max="1000" />
-    </label>
-    <label>
-      Timeout (s)
-      <input type="number" step="0.1" name="timeout" value="1.0" min="0.2" max="10" />
-    </label>
-    <label class="checkbox">
-      <input type="checkbox" name="no_vuln" /> Disable vulnerability detection
-    </label>
-    <div class="form-actions">
-      <button type="submit" class="button">Launch scan</button>
-      <p class="hint">Use only on systems you own or have permission to test.</p>
-    </div>
-  </form>
+  {% if user and user.role in ["analyst", "admin"] %}
+    <form method="post" action="{{ url_for('start_scan') }}" class="grid-form">
+      <label>
+        Targets (CIDR or range)
+        <input type="text" name="targets" placeholder="192.168.1.0/24" required />
+      </label>
+      <label>
+        TCP ports
+        <input type="text" name="ports" placeholder="22,80,443,3389" />
+      </label>
+      <label>
+        UDP ports
+        <input type="text" name="udp_ports" placeholder="53,161" />
+      </label>
+      <label>
+        Discovery methods
+        <input type="text" name="discovery" placeholder="ping,tcp,arp" />
+      </label>
+      <label>
+        Timing profile
+        <select name="timing">
+          <option value="paranoid">paranoid</option>
+          <option value="slow">slow</option>
+          <option value="normal" selected>normal</option>
+          <option value="fast">fast</option>
+        </select>
+      </label>
+      <label>
+        Threads
+        <input type="number" name="threads" value="200" min="10" max="1000" />
+      </label>
+      <label>
+        Timeout (s)
+        <input type="number" step="0.1" name="timeout" value="1.0" min="0.2" max="10" />
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" name="no_vuln" /> Disable vulnerability detection
+      </label>
+      <div class="form-actions">
+        <button type="submit" class="button">Launch scan</button>
+        <p class="hint">Use only on systems you own or have permission to test.</p>
+      </div>
+    </form>
+  {% else %}
+    <p class="muted">Your role does not allow running scans. Ask an admin for access.</p>
+  {% endif %}
 </section>
 
 <section class="panel">

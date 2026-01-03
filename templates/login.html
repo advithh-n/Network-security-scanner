@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel auth-panel">
+  <h2>Sign in</h2>
+  <form method="post" action="{{ url_for('login') }}" class="grid-form">
+    <label>
+      Username
+      <input type="text" name="username" required />
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required />
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="button">Login</button>
+      {% if error %}<p class="hint" style="color: var(--danger);">{{ error }}</p>{% endif %}
+    </div>
+  </form>
+  <p class="muted">Default users: admin/admin123, analyst/analyst123, viewer/viewer123</p>
+</section>
+{% endblock %}

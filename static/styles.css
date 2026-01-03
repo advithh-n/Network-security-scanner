@@ -75,6 +75,12 @@ body {
   font-size: 0.95rem;
 }
 
+.user-badge {
+  margin-left: 20px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 .content {
   padding: 0 6vw 80px;
   display: flex;

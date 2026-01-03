@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -10,7 +11,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
-from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, url_for
+from functools import wraps
+
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_file, session, url_for
 
 BASE_DIR = Path(__file__).resolve().parent
 SCAN_DIR = BASE_DIR / "data" / "scan_results"
@@ -21,6 +24,15 @@ DEMO_HTML = BASE_DIR / "reports" / "sample_reports" / "demo_report.html"
 LOCK = threading.Lock()
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("NSS_SECRET_KEY", "change-this-secret")
+
+USERS = {
+    "admin": {"password": "admin123", "role": "admin"},
+    "analyst": {"password": "analyst123", "role": "analyst"},
+    "viewer": {"password": "viewer123", "role": "viewer"},
+}
+
+ROLE_ORDER = {"viewer": 1, "analyst": 2, "admin": 3}
 
 
 def _ensure_dirs() -> None:
@@ -69,6 +81,37 @@ def clean_discovery(value: str) -> str:
     allowed = {"ping", "tcp", "arp"}
     parts = [p.strip() for p in value.split(",") if p.strip()]
     return ",".join([p for p in parts if p in allowed]) or "ping,tcp"
+
+
+def current_user() -> Dict[str, str]:
+    username = session.get("username")
+    if not username:
+        return {}
+    user = USERS.get(username, {})
+    return {"username": username, "role": user.get("role", "")}
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not session.get("username"):
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def require_role(min_role: str):
+    def decorator(view):
+        @wraps(view)
+        def wrapper(*args, **kwargs):
+            user = current_user()
+            if not user:
+                return redirect(url_for("login"))
+            if ROLE_ORDER.get(user.get("role", ""), 0) < ROLE_ORDER.get(min_role, 0):
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def build_scan_command(params: Dict[str, Any], json_out: Path, html_out: Path, pdf_out: Path) -> List[str]:
@@ -134,6 +177,7 @@ def run_scan(scan_id: str, params: Dict[str, Any]) -> None:
 
 
 @app.route("/")
+@login_required
 def index() -> str:
     items = load_index()
     items = sorted(items, key=lambda x: x.get("created_at", ""), reverse=True)
@@ -154,10 +198,30 @@ def index() -> str:
         except Exception:
             latest_summary = None
 
-    return render_template("index.html", items=items, latest_summary=latest_summary)
+    return render_template("index.html", items=items, latest_summary=latest_summary, user=current_user())
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login() -> Any:
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        user = USERS.get(username)
+        if user and user.get("password") == password:
+            session["username"] = username
+            return redirect(url_for("index"))
+        return render_template("login.html", error="Invalid credentials")
+    return render_template("login.html", error="")
+
+
+@app.route("/logout")
+def logout() -> Any:
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/scan", methods=["POST"])
+@require_role("analyst")
 def start_scan() -> Any:
     targets = request.form.get("targets", "").strip()
     if not targets:
@@ -198,6 +262,7 @@ def start_scan() -> Any:
 
 
 @app.route("/demo")
+@login_required
 def load_demo() -> Any:
     if not DEMO_JSON.exists():
         abort(404, "demo scan not found")
@@ -228,6 +293,7 @@ def load_demo() -> Any:
 
 
 @app.route("/scan/<scan_id>")
+@login_required
 def scan_detail(scan_id: str) -> str:
     items = load_index()
     record = next((i for i in items if i.get("id") == scan_id), None)
@@ -242,10 +308,11 @@ def scan_detail(scan_id: str) -> str:
         except Exception:
             scan_data = None
 
-    return render_template("scan_detail.html", record=record, scan_data=scan_data)
+    return render_template("scan_detail.html", record=record, scan_data=scan_data, user=current_user())
 
 
 @app.route("/download/<scan_id>/<kind>")
+@login_required
 def download(scan_id: str, kind: str) -> Any:
     items = load_index()
     record = next((i for i in items if i.get("id") == scan_id), None)
@@ -263,6 +330,7 @@ def download(scan_id: str, kind: str) -> Any:
 
 
 @app.route("/api/scan/<scan_id>")
+@login_required
 def scan_status(scan_id: str) -> Any:
     items = load_index()
     record = next((i for i in items if i.get("id") == scan_id), None)
