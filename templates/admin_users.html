@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>User Management</h2>
+      <p class="muted">Create and remove users with role-based access.</p>
+    </div>
+    <div class="panel-actions">
+      <a class="button ghost" href="{{ url_for('admin_audit') }}">View audit log</a>
+    </div>
+  </div>
+
+  {% if message %}<p class="hint" style="color: var(--success);">{{ message }}</p>{% endif %}
+  {% if error %}<p class="hint" style="color: var(--danger);">{{ error }}</p>{% endif %}
+
+  <form method="post" action="{{ url_for('admin_users') }}" class="grid-form">
+    <label>
+      Username
+      <input type="text" name="username" required />
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" required />
+    </label>
+    <label>
+      Role
+      <select name="role">
+        <option value="viewer">viewer</option>
+        <option value="analyst">analyst</option>
+        <option value="admin">admin</option>
+      </select>
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="button">Create user</button>
+      <p class="hint">Passwords are stored as salted hashes in `data/users.json`.</p>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Existing users</h2>
+  <div class="table">
+    <div class="table-head">
+      <div>Username</div>
+      <div>Role</div>
+      <div>Action</div>
+    </div>
+    {% for item in users %}
+      <div class="table-row">
+        <div class="mono">{{ item.username }}</div>
+        <div>{{ item.role }}</div>
+        <div>
+          <form method="post" action="{{ url_for('admin_delete_user', username=item.username) }}">
+            <button class="button ghost" type="submit">Delete</button>
+          </form>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

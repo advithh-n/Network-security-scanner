@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import threading
@@ -21,16 +23,12 @@ REPORT_DIR = BASE_DIR / "reports"
 INDEX_PATH = SCAN_DIR / "index.json"
 DEMO_JSON = BASE_DIR / "data" / "demo_scan.json"
 DEMO_HTML = BASE_DIR / "reports" / "sample_reports" / "demo_report.html"
+USERS_PATH = BASE_DIR / "data" / "users.json"
+AUDIT_PATH = BASE_DIR / "data" / "audit.log"
 LOCK = threading.Lock()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("NSS_SECRET_KEY", "change-this-secret")
-
-USERS = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "analyst": {"password": "analyst123", "role": "analyst"},
-    "viewer": {"password": "viewer123", "role": "viewer"},
-}
 
 ROLE_ORDER = {"viewer": 1, "analyst": 2, "admin": 3}
 
@@ -83,11 +81,71 @@ def clean_discovery(value: str) -> str:
     return ",".join([p for p in parts if p in allowed]) or "ping,tcp"
 
 
+def hash_password(password: str, salt: str) -> str:
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+    return digest.hex()
+
+
+def create_user_record(username: str, password: str, role: str) -> Dict[str, str]:
+    salt = secrets.token_hex(16)
+    return {
+        "username": username,
+        "role": role,
+        "salt": salt,
+        "password_hash": hash_password(password, salt),
+    }
+
+
+def ensure_users() -> None:
+    if USERS_PATH.exists():
+        return
+    users = {
+        "admin": create_user_record("admin", "admin123", "admin"),
+        "analyst": create_user_record("analyst", "analyst123", "analyst"),
+        "viewer": create_user_record("viewer", "viewer123", "viewer"),
+    }
+    USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    USERS_PATH.write_text(json.dumps(users, indent=2), encoding="ascii")
+
+
+def load_users() -> Dict[str, Dict[str, str]]:
+    ensure_users()
+    try:
+        return json.loads(USERS_PATH.read_text(encoding="ascii"))
+    except Exception:
+        return {}
+
+
+def save_users(users: Dict[str, Dict[str, str]]) -> None:
+    USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    USERS_PATH.write_text(json.dumps(users, indent=2), encoding="ascii")
+
+
+def verify_password(password: str, user_record: Dict[str, str]) -> bool:
+    salt = user_record.get("salt", "")
+    expected = user_record.get("password_hash", "")
+    if not salt or not expected:
+        return False
+    return hash_password(password, salt) == expected
+
+
+def log_event(event_type: str, detail: str, username: str = "") -> None:
+    AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "time": _now_iso(),
+        "event": event_type,
+        "user": username,
+        "detail": detail,
+    }
+    with AUDIT_PATH.open("a", encoding="ascii") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
 def current_user() -> Dict[str, str]:
     username = session.get("username")
     if not username:
         return {}
-    user = USERS.get(username, {})
+    user = load_users().get(username, {})
     return {"username": username, "role": user.get("role", "")}
 
 
@@ -174,6 +232,7 @@ def run_scan(scan_id: str, params: Dict[str, Any]) -> None:
         status = "failed"
 
     update_record(scan_id, {"status": status, "finished_at": _now_iso()})
+    log_event("scan_finished", f"id={scan_id} status={status}", params.get("username", ""))
 
 
 @app.route("/")
@@ -206,17 +265,23 @@ def login() -> Any:
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        user = USERS.get(username)
-        if user and user.get("password") == password:
+        users = load_users()
+        user = users.get(username)
+        if user and verify_password(password, user):
             session["username"] = username
+            log_event("login_success", "user logged in", username)
             return redirect(url_for("index"))
+        log_event("login_failed", "invalid credentials", username)
         return render_template("login.html", error="Invalid credentials")
     return render_template("login.html", error="")
 
 
 @app.route("/logout")
 def logout() -> Any:
+    username = session.get("username", "")
     session.clear()
+    if username:
+        log_event("logout", "user logged out", username)
     return redirect(url_for("login"))
 
 
@@ -239,6 +304,7 @@ def start_scan() -> Any:
     }
 
     scan_id = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:6]
+    username = session.get("username", "")
     record = {
         "id": scan_id,
         "created_at": _now_iso(),
@@ -255,6 +321,8 @@ def start_scan() -> Any:
         items.append(record)
         save_index(items)
 
+    params["username"] = username
+    log_event("scan_started", f"id={scan_id} targets={params['targets']}", username)
     thread = threading.Thread(target=run_scan, args=(scan_id, params), daemon=True)
     thread.start()
 
@@ -289,6 +357,7 @@ def load_demo() -> Any:
         items.insert(0, record)
         save_index(items)
 
+    log_event("demo_loaded", "demo dataset loaded", session.get("username", ""))
     return redirect(url_for("scan_detail", scan_id=demo_id))
 
 
@@ -339,6 +408,69 @@ def scan_status(scan_id: str) -> Any:
     return jsonify(record)
 
 
+@app.route("/admin/users", methods=["GET", "POST"])
+@require_role("admin")
+def admin_users() -> Any:
+    message = request.args.get("message", "")
+    error = ""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        role = request.form.get("role", "").strip()
+        if not username or not password:
+            error = "Username and password are required"
+        elif role not in ROLE_ORDER:
+            error = "Invalid role"
+        else:
+            users = load_users()
+            if username in users:
+                error = "User already exists"
+            else:
+                users[username] = create_user_record(username, password, role)
+                save_users(users)
+                log_event("user_created", f"created {username} role={role}", session.get("username", ""))
+                return redirect(url_for("admin_users", message="User created"))
+
+    users = load_users()
+    user_list = sorted(users.values(), key=lambda u: u.get("username", ""))
+    return render_template(
+        "admin_users.html",
+        users=user_list,
+        message=message,
+        error=error,
+        user=current_user(),
+    )
+
+
+@app.route("/admin/users/<username>/delete", methods=["POST"])
+@require_role("admin")
+def admin_delete_user(username: str) -> Any:
+    current = session.get("username", "")
+    if username == current:
+        return redirect(url_for("admin_users", message="Cannot delete your own account"))
+    users = load_users()
+    if username not in users:
+        abort(404)
+    users.pop(username)
+    save_users(users)
+    log_event("user_deleted", f"deleted {username}", current)
+    return redirect(url_for("admin_users", message="User deleted"))
+
+
+@app.route("/admin/audit")
+@require_role("admin")
+def admin_audit() -> Any:
+    lines = []
+    if AUDIT_PATH.exists():
+        try:
+            lines = AUDIT_PATH.read_text(encoding="ascii").splitlines()
+        except Exception:
+            lines = []
+    recent = lines[-200:]
+    return render_template("admin_audit.html", entries=recent, user=current_user())
+
+
 if __name__ == "__main__":
     _ensure_dirs()
+    ensure_users()
     app.run(host="127.0.0.1", port=5000, debug=True)

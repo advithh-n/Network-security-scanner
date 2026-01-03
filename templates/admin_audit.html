@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>Audit Log</h2>
+      <p class="muted">Last 200 events (login, scans, user changes).</p>
+    </div>
+    <div class="panel-actions">
+      <a class="button ghost" href="{{ url_for('admin_users') }}">Back to users</a>
+    </div>
+  </div>
+
+  {% if entries %}
+    <div class="audit-log">
+      {% for entry in entries %}
+        <div class="audit-line mono">{{ entry }}</div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">No audit events yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

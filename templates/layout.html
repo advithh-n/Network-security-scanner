@@ -20,6 +20,9 @@
         <a href="{{ url_for('index') }}">Dashboard</a>
         <a href="https://github.com/advithh-n" target="_blank" rel="noreferrer">GitHub</a>
         {% if user %}
+          {% if user.role == "admin" %}
+            <a href="{{ url_for('admin_users') }}">Admin</a>
+          {% endif %}
           <span class="user-badge">{{ user.username }} ({{ user.role }})</span>
           <a href="{{ url_for('logout') }}">Logout</a>
         {% endif %}

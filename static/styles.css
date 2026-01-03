@@ -399,6 +399,23 @@ body {
   color: var(--muted);
 }
 
+.audit-log {
+  background: #0f1621;
+  padding: 16px;
+  border-radius: 12px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.audit-line {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.audit-line:last-child {
+  border-bottom: none;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;

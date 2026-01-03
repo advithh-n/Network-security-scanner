@@ -48,3 +48,6 @@ Default users (change these in `app.py` before sharing):
 - admin / admin123
 - analyst / analyst123
 - viewer / viewer123
+
+Users are stored as salted password hashes in `data/users.json` (auto-created on first run).
+Audit events are written to `data/audit.log` and viewable from the Admin panel.
