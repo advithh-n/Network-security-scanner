@@ -49,5 +49,5 @@ Default users (change these in `app.py` before sharing):
 - analyst / analyst123
 - viewer / viewer123
 
-Users are stored as salted password hashes in `data/users.json` (auto-created on first run).
-Audit events are written to `data/audit.log` and viewable from the Admin panel.
+Users are stored as salted password hashes in `data/users.db` (auto-created on first run).
+Audit events are stored in the same SQLite database and viewable from the Admin panel.

@@ -9,8 +9,7 @@ venv/
 # Local data
 /data/scan_results/*.json
 /data/scan_results/*.log
-/data/users.json
-/data/audit.log
+/data/users.db
 /reports/report_*.html
 /reports/report_*.pdf
 

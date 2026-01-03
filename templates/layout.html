@@ -23,6 +23,7 @@
           {% if user.role == "admin" %}
             <a href="{{ url_for('admin_users') }}">Admin</a>
           {% endif %}
+          <a href="{{ url_for('change_password') }}">Change password</a>
           <span class="user-badge">{{ user.username }} ({{ user.role }})</span>
           <a href="{{ url_for('logout') }}">Logout</a>
         {% endif %}

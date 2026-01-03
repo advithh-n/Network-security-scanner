@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import os
 import re
 import secrets
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -23,8 +26,7 @@ REPORT_DIR = BASE_DIR / "reports"
 INDEX_PATH = SCAN_DIR / "index.json"
 DEMO_JSON = BASE_DIR / "data" / "demo_scan.json"
 DEMO_HTML = BASE_DIR / "reports" / "sample_reports" / "demo_report.html"
-USERS_PATH = BASE_DIR / "data" / "users.json"
-AUDIT_PATH = BASE_DIR / "data" / "audit.log"
+DB_PATH = BASE_DIR / "data" / "users.db"
 LOCK = threading.Lock()
 
 app = Flask(__name__)
@@ -96,29 +98,59 @@ def create_user_record(username: str, password: str, role: str) -> Dict[str, str
     }
 
 
+def get_db() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    conn = get_db()
+    with conn:
+        conn.execute(
+            \"\"\"
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                role TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL
+            )
+            \"\"\"
+        )
+        conn.execute(
+            \"\"\"
+            CREATE TABLE IF NOT EXISTS audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                time TEXT NOT NULL,
+                event TEXT NOT NULL,
+                user TEXT NOT NULL,
+                detail TEXT NOT NULL
+            )
+            \"\"\"
+        )
+    conn.close()
+
+
 def ensure_users() -> None:
-    if USERS_PATH.exists():
-        return
-    users = {
-        "admin": create_user_record("admin", "admin123", "admin"),
-        "analyst": create_user_record("analyst", "analyst123", "analyst"),
-        "viewer": create_user_record("viewer", "viewer123", "viewer"),
-    }
-    USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    USERS_PATH.write_text(json.dumps(users, indent=2), encoding="ascii")
-
-
-def load_users() -> Dict[str, Dict[str, str]]:
-    ensure_users()
-    try:
-        return json.loads(USERS_PATH.read_text(encoding="ascii"))
-    except Exception:
-        return {}
-
-
-def save_users(users: Dict[str, Dict[str, str]]) -> None:
-    USERS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    USERS_PATH.write_text(json.dumps(users, indent=2), encoding="ascii")
+    init_db()
+    conn = get_db()
+    defaults = [
+        ("admin", "admin123", "admin"),
+        ("analyst", "analyst123", "analyst"),
+        ("viewer", "viewer123", "viewer"),
+    ]
+    with conn:
+        for username, password, role in defaults:
+            row = conn.execute("SELECT username FROM users WHERE username = ?", (username,)).fetchone()
+            if row:
+                continue
+            record = create_user_record(username, password, role)
+            conn.execute(
+                "INSERT INTO users (username, role, salt, password_hash) VALUES (?, ?, ?, ?)",
+                (record["username"], record["role"], record["salt"], record["password_hash"]),
+            )
+    conn.close()
 
 
 def verify_password(password: str, user_record: Dict[str, str]) -> bool:
@@ -130,22 +162,66 @@ def verify_password(password: str, user_record: Dict[str, str]) -> bool:
 
 
 def log_event(event_type: str, detail: str, username: str = "") -> None:
-    AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    entry = {
-        "time": _now_iso(),
-        "event": event_type,
-        "user": username,
-        "detail": detail,
-    }
-    with AUDIT_PATH.open("a", encoding="ascii") as f:
-        f.write(json.dumps(entry) + "\n")
+    init_db()
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "INSERT INTO audit (time, event, user, detail) VALUES (?, ?, ?, ?)",
+            (_now_iso(), event_type, username, detail),
+        )
+    conn.close()
+
+
+def fetch_user(username: str) -> Dict[str, str]:
+    conn = get_db()
+    row = conn.execute("SELECT username, role, salt, password_hash FROM users WHERE username = ?", (username,)).fetchone()
+    conn.close()
+    if not row:
+        return {}
+    return dict(row)
+
+
+def list_users() -> List[Dict[str, str]]:
+    conn = get_db()
+    rows = conn.execute("SELECT username, role FROM users ORDER BY username").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def create_user(username: str, password: str, role: str) -> None:
+    record = create_user_record(username, password, role)
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "INSERT INTO users (username, role, salt, password_hash) VALUES (?, ?, ?, ?)",
+            (record["username"], record["role"], record["salt"], record["password_hash"]),
+        )
+    conn.close()
+
+
+def update_password(username: str, password: str) -> None:
+    record = create_user_record(username, password, "viewer")
+    conn = get_db()
+    with conn:
+        conn.execute(
+            "UPDATE users SET salt = ?, password_hash = ? WHERE username = ?",
+            (record["salt"], record["password_hash"], username),
+        )
+    conn.close()
+
+
+def delete_user(username: str) -> None:
+    conn = get_db()
+    with conn:
+        conn.execute("DELETE FROM users WHERE username = ?", (username,))
+    conn.close()
 
 
 def current_user() -> Dict[str, str]:
     username = session.get("username")
     if not username:
         return {}
-    user = load_users().get(username, {})
+    user = fetch_user(username)
     return {"username": username, "role": user.get("role", "")}
 
 
@@ -265,8 +341,7 @@ def login() -> Any:
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        users = load_users()
-        user = users.get(username)
+        user = fetch_user(username)
         if user and verify_password(password, user):
             session["username"] = username
             log_event("login_success", "user logged in", username)
@@ -408,6 +483,27 @@ def scan_status(scan_id: str) -> Any:
     return jsonify(record)
 
 
+@app.route("/account/password", methods=["GET", "POST"])
+@login_required
+def change_password() -> Any:
+    message = ""
+    error = ""
+    if request.method == "POST":
+        current = request.form.get("current_password", "").strip()
+        new_pw = request.form.get("new_password", "").strip()
+        confirm = request.form.get("confirm_password", "").strip()
+        user = fetch_user(session.get("username", ""))
+        if not verify_password(current, user):
+            error = "Current password is incorrect"
+        elif not new_pw or new_pw != confirm:
+            error = "New passwords do not match"
+        else:
+            update_password(user["username"], new_pw)
+            log_event("password_change", "user changed password", user["username"])
+            message = "Password updated"
+    return render_template("change_password.html", message=message, error=error, user=current_user())
+
+
 @app.route("/admin/users", methods=["GET", "POST"])
 @require_role("admin")
 def admin_users() -> Any:
@@ -422,17 +518,15 @@ def admin_users() -> Any:
         elif role not in ROLE_ORDER:
             error = "Invalid role"
         else:
-            users = load_users()
-            if username in users:
+            existing = fetch_user(username)
+            if existing:
                 error = "User already exists"
             else:
-                users[username] = create_user_record(username, password, role)
-                save_users(users)
+                create_user(username, password, role)
                 log_event("user_created", f"created {username} role={role}", session.get("username", ""))
                 return redirect(url_for("admin_users", message="User created"))
 
-    users = load_users()
-    user_list = sorted(users.values(), key=lambda u: u.get("username", ""))
+    user_list = list_users()
     return render_template(
         "admin_users.html",
         users=user_list,
@@ -448,11 +542,10 @@ def admin_delete_user(username: str) -> Any:
     current = session.get("username", "")
     if username == current:
         return redirect(url_for("admin_users", message="Cannot delete your own account"))
-    users = load_users()
-    if username not in users:
+    user = fetch_user(username)
+    if not user:
         abort(404)
-    users.pop(username)
-    save_users(users)
+    delete_user(username)
     log_event("user_deleted", f"deleted {username}", current)
     return redirect(url_for("admin_users", message="User deleted"))
 
@@ -460,14 +553,54 @@ def admin_delete_user(username: str) -> Any:
 @app.route("/admin/audit")
 @require_role("admin")
 def admin_audit() -> Any:
-    lines = []
-    if AUDIT_PATH.exists():
-        try:
-            lines = AUDIT_PATH.read_text(encoding="ascii").splitlines()
-        except Exception:
-            lines = []
-    recent = lines[-200:]
-    return render_template("admin_audit.html", entries=recent, user=current_user())
+    init_db()
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT time, event, user, detail FROM audit ORDER BY id DESC LIMIT 200"
+    ).fetchall()
+    conn.close()
+    entries = [dict(row) for row in rows]
+    return render_template("admin_audit.html", entries=entries, user=current_user())
+
+
+@app.route("/admin/audit.csv")
+@require_role("admin")
+def admin_audit_csv() -> Any:
+    init_db()
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT time, event, user, detail FROM audit ORDER BY id DESC"
+    ).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["time", "event", "user", "detail"])
+    for row in rows:
+        writer.writerow([row["time"], row["event"], row["user"], row["detail"]])
+    output.seek(0)
+
+    return send_file(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="audit_log.csv",
+    )
+
+
+@app.route("/admin/users/reset", methods=["POST"])
+@require_role("admin")
+def admin_reset_password() -> Any:
+    username = request.form.get("reset_username", "").strip()
+    new_pw = request.form.get("reset_password", "").strip()
+    if not username or not new_pw:
+        return redirect(url_for("admin_users", message="Username and password required"))
+    user = fetch_user(username)
+    if not user:
+        return redirect(url_for("admin_users", message="User not found"))
+    update_password(username, new_pw)
+    log_event("password_reset", f"reset password for {username}", session.get("username", ""))
+    return redirect(url_for("admin_users", message="Password reset"))
 
 
 if __name__ == "__main__":

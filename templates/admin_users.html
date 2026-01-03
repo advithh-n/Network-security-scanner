@@ -33,7 +33,24 @@
     </label>
     <div class="form-actions">
       <button type="submit" class="button">Create user</button>
-      <p class="hint">Passwords are stored as salted hashes in `data/users.json`.</p>
+      <p class="hint">Passwords are stored as salted hashes in `data/users.db`.</p>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Reset user password</h2>
+  <form method="post" action="{{ url_for('admin_reset_password') }}" class="grid-form">
+    <label>
+      Username
+      <input type="text" name="reset_username" required />
+    </label>
+    <label>
+      New password
+      <input type="password" name="reset_password" required />
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="button ghost">Reset password</button>
     </div>
   </form>
 </section>

@@ -8,13 +8,25 @@
     </div>
     <div class="panel-actions">
       <a class="button ghost" href="{{ url_for('admin_users') }}">Back to users</a>
+      <a class="button" href="{{ url_for('admin_audit_csv') }}">Download CSV</a>
     </div>
   </div>
 
   {% if entries %}
-    <div class="audit-log">
+    <div class="table">
+      <div class="table-head">
+        <div>Time</div>
+        <div>Event</div>
+        <div>User</div>
+        <div>Detail</div>
+      </div>
       {% for entry in entries %}
-        <div class="audit-line mono">{{ entry }}</div>
+        <div class="table-row">
+          <div class="mono">{{ entry.time }}</div>
+          <div>{{ entry.event }}</div>
+          <div>{{ entry.user }}</div>
+          <div>{{ entry.detail }}</div>
+        </div>
       {% endfor %}
     </div>
   {% else %}
